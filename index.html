@@ -496,21 +496,25 @@ window.leaveRoom = function(){
 };
 
 function handleStateUpdate(state){
+  // myRole이 설정되지 않은 경우 무시 (리스너가 너무 일찍 실행된 경우)
+  if(!myRole) return;
+
   if(state.phase==='waiting'){
-    // 방장은 대기화면, 게스트는 아직 없음
+    show('waiting-room');
+    hide('game-ui'); hide('end-screen'); hide('lobby');
     return;
   }
   if(state.phase==='playing'){
-    // 대기방/로비 숨기고 게임 시작
+    // 게스트 참가 완료 → 양쪽 모두 게임 화면으로 전환
     hide('waiting-room'); hide('lobby'); hide('end-screen');
     show('game-ui');
-    renderGame(state);
+    try { renderGame(state); } catch(e){ console.error('renderGame error:', e); }
     return;
   }
   if(state.phase==='ended'){
     hide('game-ui'); hide('waiting-room'); hide('lobby');
     show('end-screen');
-    renderEndScreen(state);
+    try { renderEndScreen(state); } catch(e){ console.error('renderEndScreen error:', e); }
     return;
   }
 }
@@ -524,8 +528,10 @@ function isMyTurn(state){
 }
 
 function renderGame(state){
+  if(!myRole || !state.players) return;
   const me=state.players[myRole];
   const opp=state.players[oppKey()];
+  if(!me || !opp) return;
 
   // names & scores
   const meScore=calcTotalScore(me.expeditions);
