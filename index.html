@@ -371,28 +371,47 @@ function shuffle(arr){
   return a;
 }
 
+// ── FIREBASE 배열 안전 변환 ──
+// Firebase는 빈 배열을 null로, 배열을 {0:...,1:...} 객체로 바꾸는 경우가 있음
+function toArr(val){
+  if(!val) return [];
+  if(Array.isArray(val)) return val;
+  return Object.values(val);
+}
+function safeExp(exp){
+  const r={};
+  for(const c of COLORS) r[c]=toArr(exp?.[c]);
+  return r;
+}
+function safeDiscards(dp){
+  const r={};
+  for(const c of COLORS) r[c]=toArr(dp?.[c]);
+  return r;
+}
+
 // ── SCORING ──
 function calcExpeditionScore(cards){
-  if(!cards||cards.length===0) return 0;
-  const wagers=cards.filter(c=>c.value==='W').length;
-  const sum=cards.filter(c=>c.value!=='W').reduce((s,c)=>s+c.value,0);
+  const arr=toArr(cards);
+  if(arr.length===0) return 0;
+  const wagers=arr.filter(c=>c.value==='W').length;
+  const sum=arr.filter(c=>c.value!=='W').reduce((s,c)=>s+Number(c.value),0);
   let score=(sum-COST)*(wagers+1);
-  if(cards.length>=8) score+=20;
+  if(arr.length>=8) score+=20;
   return score;
 }
 function calcTotalScore(expeditions){
   let t=0;
-  for(const c of COLORS) t+=calcExpeditionScore(expeditions?.[c]||[]);
+  for(const c of COLORS) t+=calcExpeditionScore(toArr(expeditions?.[c]));
   return t;
 }
 
 function canPlayCard(card, expeditions){
-  const exp=expeditions?.[card.color]||[];
+  const exp=toArr(expeditions?.[card.color]);
   if(exp.length===0) return true;
   const last=exp[exp.length-1];
   if(card.value==='W') return last.value==='W';
   if(last.value==='W') return true;
-  return card.value>last.value;
+  return Number(card.value)>Number(last.value);
 }
 
 // ── ROOM CREATION ──
@@ -520,7 +539,7 @@ function renderGame(state){
   $('p2-name').textContent=rightP.nickname||(rightKey==='host'?'방장':'게스트');
   $('p1-score').textContent=calcTotalScore(leftP.expeditions);
   $('p2-score').textContent=calcTotalScore(rightP.expeditions);
-  $('deck-count').textContent=(state.deck||[]).length;
+  $('deck-count').textContent=toArr(state.deck).length;
 
   // highlight whose turn
   $('p1-box').classList.toggle('active-turn', state.currentTurn===leftKey);
@@ -530,10 +549,11 @@ function renderGame(state){
   $('conn-badge-wrap').innerHTML=`<span class="conn-badge connected"><span class="conn-dot"></span>연결됨</span>`;
 
   // opponent hand (backs)
-  $('opp-label').textContent=`${opp.nickname||'상대방'} 손패 (${(opp.hand||[]).length}장)`;
+  const oppHand=toArr(opp.hand);
+  $('opp-label').textContent=`${opp.nickname||'상대방'} 손패 (${oppHand.length}장)`;
   const oppHandEl=$('opponent-hand-display');
   oppHandEl.innerHTML='';
-  for(let i=0;i<(opp.hand||[]).length;i++){
+  for(let i=0;i<oppHand.length;i++){
     const d=document.createElement('div'); d.className='opp-card-back'; oppHandEl.appendChild(d);
   }
 
@@ -541,7 +561,8 @@ function renderGame(state){
   renderBoard(state);
 
   // hand
-  $('hand-label').textContent=`${me.nickname||'나'} 손패 (${(me.hand||[]).length}장)`;
+  const myHand=toArr(me.hand);
+  $('hand-label').textContent=`${me.nickname||'나'} 손패 (${myHand.length}장)`;
   renderHand(state);
 
   // status
@@ -558,7 +579,7 @@ function renderGame(state){
   const drawPhase=state.actionPhase==='draw';
   $('btn-discard').disabled=!myTurn||drawPhase||!selectedCard;
   $('btn-draw-deck').disabled=!myTurn||!drawPhase;
-  $('btn-draw-deck').textContent=`덱에서 뽑기 (${(state.deck||[]).length}장)`;
+  $('btn-draw-deck').textContent=`덱에서 뽑기 (${toArr(state.deck).length}장)`;
 
   // dynamic play button
   let playBtn=$('btn-play-dyn');
@@ -580,9 +601,9 @@ function renderGame(state){
 function renderBoard(state){
   const rows=$('color-rows');
   rows.innerHTML='';
-  const leftExp=state.players['host'].expeditions;
-  const rightExp=state.players['guest'].expeditions;
-  const discards=state.discardPiles||{};
+  const leftExp=safeExp(state.players['host'].expeditions);
+  const rightExp=safeExp(state.players['guest'].expeditions);
+  const discards=safeDiscards(state.discardPiles);
   const myTurn=isMyTurn(state);
   const drawPhase=state.actionPhase==='draw';
 
@@ -641,7 +662,7 @@ function renderHand(state){
   const myTurn=isMyTurn(state);
   const playPhase=state.actionPhase==='play';
 
-  for(const card of (me.hand||[])){
+  for(const card of toArr(me.hand)){
     const isSel=selectedCard?.id===card.id;
     const div=document.createElement('div');
     div.innerHTML=cardHTML(card, myTurn&&playPhase, isSel, false);
@@ -684,11 +705,11 @@ async function doPlay(){
   const me=state.players[myRole];
   if(!canPlayCard(selectedCard, me.expeditions)){ setStatus('⚠️ 이 카드는 현재 낼 수 없습니다.'); return; }
 
-  const newHand=(me.hand||[]).filter(c=>c.id!==selectedCard.id);
-  const newExp=JSON.parse(JSON.stringify(me.expeditions));
-  newExp[selectedCard.color]=[...(newExp[selectedCard.color]||[]),selectedCard];
+  const newHand=toArr(me.hand).filter(c=>c.id!==selectedCard.id);
+  const newExp=safeExp(me.expeditions);
+  newExp[selectedCard.color]=[...newExp[selectedCard.color], selectedCard];
 
-  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand,expeditions:newExp});
+  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand, expeditions:newExp});
   await update(ref(db,`rooms/${roomId}`),{actionPhase:'draw'});
   selectedCard=null;
 }
@@ -698,9 +719,9 @@ window.discardSelected = async function(){
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='play') return;
   const me=state.players[myRole];
-  const newHand=(me.hand||[]).filter(c=>c.id!==selectedCard.id);
-  const newDiscard=JSON.parse(JSON.stringify(state.discardPiles||{}));
-  newDiscard[selectedCard.color]=[...(newDiscard[selectedCard.color]||[]),selectedCard];
+  const newHand=toArr(me.hand).filter(c=>c.id!==selectedCard.id);
+  const newDiscard=safeDiscards(state.discardPiles);
+  newDiscard[selectedCard.color]=[...newDiscard[selectedCard.color], selectedCard];
 
   await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
   await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard, actionPhase:'draw'});
@@ -715,11 +736,11 @@ async function doDrawDeck(){
   if(!gameState) return;
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='draw') return;
-  const deck=[...(state.deck||[])];
+  const deck=toArr(state.deck);
   if(deck.length===0) return;
   const card=deck.pop();
   const me=state.players[myRole];
-  const newHand=[...(me.hand||[]),card];
+  const newHand=[...toArr(me.hand), card];
   await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
   const nextTurn=myRole==='host'?'guest':'host';
 
@@ -735,16 +756,16 @@ async function doDrawDiscard(color){
   if(!gameState) return;
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='draw') return;
-  const pile=[...(state.discardPiles?.[color]||[])];
+  const newDiscard=safeDiscards(state.discardPiles);
+  const pile=newDiscard[color];
   if(pile.length===0) return;
   const card=pile.pop();
-  const newDiscard=JSON.parse(JSON.stringify(state.discardPiles||{}));
   newDiscard[color]=pile;
   const me=state.players[myRole];
-  const newHand=[...(me.hand||[]),card];
+  const newHand=[...toArr(me.hand), card];
   await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
   const nextTurn=myRole==='host'?'guest':'host';
-  const deck=state.deck||[];
+  const deck=toArr(state.deck);
   if(deck.length===0){
     await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
   } else {
