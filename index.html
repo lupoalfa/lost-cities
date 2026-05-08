@@ -884,127 +884,127 @@ if(urlRoom){
   $('nickname-input').focus();
 }
 
-// ── SOUND ENGINE (Web Audio API) ──────────────────────────
+// ── SOUND ENGINE (Web Audio API) — 실제 카드 소리 ──────────
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
 function getCtx() {
   if (!audioCtx) audioCtx = new AudioCtx();
-  // resume if suspended (browser autoplay policy)
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
 
-// 카드 클릭/선택 — 낮고 짧은 탁! 소리
+// 화이트 노이즈 버퍼 생성 헬퍼
+function makeNoise(ctx, duration) {
+  const len = Math.floor(ctx.sampleRate * duration);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+// 노이즈 + 필터 + 엔벨로프로 카드 소리 생성
+function playCardNoise(ctx, {
+  duration = 0.12,   // 전체 길이
+  attack = 0.003,    // 어택 타임
+  decay = 0.09,      // 디케이 타임
+  gainPeak = 0.55,   // 최대 볼륨
+  hpFreq = 800,      // 하이패스 (높을수록 얇은 소리)
+  lpFreq = 6000,     // 로우패스 (낮을수록 탁한 소리)
+  pitchShift = 0,    // 추가 피치 컬러
+  delay = 0          // 시작 딜레이
+} = {}) {
+  const t = ctx.currentTime + delay;
+  const src = ctx.createBufferSource();
+  src.buffer = makeNoise(ctx, duration + 0.02);
+
+  // 밴드패스 느낌 = HP + LP 직렬
+  const hp = ctx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = hpFreq;
+  hp.Q.value = 0.7;
+
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(lpFreq, t);
+  lp.frequency.exponentialRampToValueAtTime(lpFreq * 0.4, t + duration);
+  lp.Q.value = 1.2;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.linearRampToValueAtTime(gainPeak, t + attack);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+
+  src.connect(hp); hp.connect(lp); lp.connect(gain); gain.connect(ctx.destination);
+  src.start(t); src.stop(t + duration + 0.02);
+}
+
+// 카드 선택 — 가볍게 손으로 집는 소리
 function sfxSelect() {
   const ctx = getCtx();
-  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.06, ctx.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < data.length; i++) {
-    const t = i / ctx.sampleRate;
-    data[i] = Math.exp(-t * 60) * (Math.random() * 2 - 1) * 0.4;
-  }
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.5, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
-  src.connect(gain); gain.connect(ctx.destination);
-  src.start();
+  playCardNoise(ctx, { duration:0.08, attack:0.002, decay:0.06, gainPeak:0.3, hpFreq:1500, lpFreq:7000 });
 }
 
-// 카드 내기 (투자) — 묵직한 쿵 소리
+// 카드 내기 — 테이블에 탁 내려놓는 소리 (두 레이어)
 function sfxPlay() {
   const ctx = getCtx();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(180, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.18);
-  gain.gain.setValueAtTime(0.55, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.start(); osc.stop(ctx.currentTime + 0.22);
-
-  // 노이즈 레이어 (카드 종이 느낌)
-  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.08, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.025));
-  const ns = ctx.createBufferSource();
-  ns.buffer = buf;
-  const ng = ctx.createGain(); ng.gain.value = 0.15;
-  ns.connect(ng); ng.connect(ctx.destination);
-  ns.start();
+  // 슥 — 카드 미끄러지는 소리
+  playCardNoise(ctx, { duration:0.1, attack:0.003, decay:0.07, gainPeak:0.45, hpFreq:900, lpFreq:5000 });
+  // 탁 — 테이블 닿는 순간 (약간 낮게)
+  playCardNoise(ctx, { duration:0.07, attack:0.001, decay:0.055, gainPeak:0.5, hpFreq:300, lpFreq:2500, delay:0.06 });
 }
 
-// 카드 버리기 — 가벼운 슥- 소리
+// 카드 버리기 — 조금 더 빠르고 가볍게 던지는 소리
 function sfxDiscard() {
   const ctx = getCtx();
-  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) {
-    const t = i / ctx.sampleRate;
-    d[i] = (Math.random() * 2 - 1) * Math.exp(-t * 35) * 0.3;
-  }
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  // 하이패스 필터로 종이 슥 느낌
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'highpass';
-  filter.frequency.value = 1200;
-  const gain = ctx.createGain(); gain.gain.value = 0.6;
-  src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
-  src.start();
+  playCardNoise(ctx, { duration:0.09, attack:0.002, decay:0.065, gainPeak:0.38, hpFreq:1200, lpFreq:6500 });
+  // 살짝 뒤따라오는 잔향
+  playCardNoise(ctx, { duration:0.05, attack:0.001, decay:0.04, gainPeak:0.18, hpFreq:2000, lpFreq:8000, delay:0.05 });
 }
 
-// 카드 뽑기 — 짧은 칙- 소리
+// 카드 뽑기 — 덱에서 한 장 빼는 소리 (마찰감)
 function sfxDraw() {
   const ctx = getCtx();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(320, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.12);
-  gain.gain.setValueAtTime(0.25, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.start(); osc.stop(ctx.currentTime + 0.14);
+  // 마찰음 (조금 길게)
+  playCardNoise(ctx, { duration:0.13, attack:0.005, decay:0.1, gainPeak:0.4, hpFreq:600, lpFreq:4500 });
+  // 뽑힐 때 순간 탁
+  playCardNoise(ctx, { duration:0.06, attack:0.001, decay:0.045, gainPeak:0.3, hpFreq:400, lpFreq:3000, delay:0.1 });
 }
 
-// 게임 시작 — 웅장한 3음 팡파레
+// 게임 시작 — 카드 셔플하고 배분하는 소리
 function sfxGameStart() {
   const ctx = getCtx();
-  const notes = [220, 277, 330];
-  notes.forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
-    const t = ctx.currentTime + i * 0.13;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.3, t + 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.start(t); osc.stop(t + 0.5);
-  });
+  // 여러 장 빠르게 슥슥 넘기는 느낌
+  for (let i = 0; i < 6; i++) {
+    playCardNoise(ctx, {
+      duration: 0.07,
+      attack: 0.002,
+      decay: 0.055,
+      gainPeak: 0.25 + Math.random() * 0.15,
+      hpFreq: 800 + Math.random() * 600,
+      lpFreq: 4000 + Math.random() * 2000,
+      delay: i * 0.09 + Math.random() * 0.02
+    });
+  }
 }
 
-// 게임 종료 — 낮게 깔리는 마무리 음
+// 게임 종료 — 카드 모아서 탁 내려놓는 소리
 function sfxGameEnd() {
   const ctx = getCtx();
-  const notes = [330, 277, 220, 165];
-  notes.forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
-    const t = ctx.currentTime + i * 0.18;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.28, t + 0.06);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.start(t); osc.stop(t + 0.6);
-  });
+  // 카드 모으는 소리 3번
+  for (let i = 0; i < 3; i++) {
+    playCardNoise(ctx, {
+      duration: 0.1,
+      attack: 0.003,
+      decay: 0.08,
+      gainPeak: 0.35 + i * 0.08,
+      hpFreq: 500 - i * 80,
+      lpFreq: 4000 - i * 400,
+      delay: i * 0.15
+    });
+  }
+  // 마지막 탁 — 무더기로 내려놓기
+  playCardNoise(ctx, { duration:0.15, attack:0.002, decay:0.13, gainPeak:0.65, hpFreq:250, lpFreq:2000, delay:0.48 });
 }
 
 </script>
