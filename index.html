@@ -6,6 +6,28 @@
 <title>Lost Cities · Online</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
 <style>
+  @font-face {
+    font-family: 'NanumSquareRound';
+    src: url('https://fastly.jsdelivr.net/npm/@kfonts/nanumsquare-round@0.1.1/NanumSquareRoundL.woff2') format('woff2');
+    font-weight: 300;
+  }
+  @font-face {
+    font-family: 'NanumSquareRound';
+    src: url('https://fastly.jsdelivr.net/npm/@kfonts/nanumsquare-round@0.1.1/NanumSquareRoundR.woff2') format('woff2');
+    font-weight: 400;
+  }
+  @font-face {
+    font-family: 'NanumSquareRound';
+    src: url('https://fastly.jsdelivr.net/npm/@kfonts/nanumsquare-round@0.1.1/NanumSquareRoundB.woff2') format('woff2');
+    font-weight: 700;
+  }
+  @font-face {
+    font-family: 'NanumSquareRound';
+    src: url('https://fastly.jsdelivr.net/npm/@kfonts/nanumsquare-round@0.1.1/NanumSquareRoundEB.woff2') format('woff2');
+    font-weight: 900;
+  }
+</style>
+<style>
   :root {
     --parchment: #f2e8d0;
     --parchment-dark: #e0d0b0;
@@ -21,7 +43,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     background: var(--ink);
-    font-family: 'Crimson Pro', serif;
+    font-family: 'NanumSquareRound', sans-serif;
     min-height: 100vh;
     display: flex; flex-direction: column; align-items: center;
     color: var(--ink);
@@ -40,7 +62,7 @@
   }
   header { text-align: center; padding: 10px 0 4px; }
   header h1 {
-    font-family: 'Cinzel', serif;
+    font-family: 'NanumSquareRound', sans-serif;
     font-size: clamp(1.4rem,4vw,2.2rem); font-weight: 900;
     color: var(--gold); text-shadow: 0 2px 8px #00000080; letter-spacing: .08em;
   }
@@ -56,25 +78,25 @@
     border: 1px solid var(--gold-light); border-radius: 4px; opacity: .3; pointer-events: none;
   }
   .panel-title {
-    font-family: 'Cinzel', serif; font-size: .65rem;
+    font-family: 'NanumSquareRound', sans-serif; font-size: .65rem;
     letter-spacing: .15em; text-transform: uppercase; color: var(--ink-light); margin-bottom: 6px;
   }
 
   /* ── LOBBY ── */
   #lobby { max-width: 460px; margin: 30px auto; text-align: center; }
-  #lobby h2 { font-family: 'Cinzel', serif; font-size: 1.5rem; margin-bottom: 8px; }
+  #lobby h2 { font-family: 'NanumSquareRound', sans-serif; font-size: 1.5rem; margin-bottom: 8px; }
   #lobby p { color: var(--ink-light); line-height: 1.6; margin-bottom: 16px; }
   .lobby-input {
     width: 100%; padding: 10px 12px; border-radius: 4px;
     border: 2px solid var(--ink-light); background: #fff8ee;
-    font-family: 'Crimson Pro', serif; font-size: 1rem; color: var(--ink);
+    font-family: 'NanumSquareRound', sans-serif; font-size: 1rem; color: var(--ink);
     margin-bottom: 8px; outline: none;
   }
   .lobby-input:focus { border-color: var(--gold); }
   .btn {
     padding: 10px 22px; border-radius: 4px; border: 2px solid var(--gold);
     background: var(--ink); color: var(--gold);
-    font-family: 'Cinzel', serif; font-size: .82rem; letter-spacing: .05em;
+    font-family: 'NanumSquareRound', sans-serif; font-size: .82rem; letter-spacing: .05em;
     cursor: pointer; transition: all .15s; display: inline-block;
   }
   .btn:hover:not(:disabled) { background: var(--gold); color: var(--ink); }
@@ -91,7 +113,7 @@
   .room-code-box {
     background: var(--ink); color: var(--gold);
     border-radius: 4px; padding: 10px 16px;
-    font-family: 'Cinzel', serif; font-size: 1.6rem; letter-spacing: .2em;
+    font-family: 'NanumSquareRound', sans-serif; font-size: 1.6rem; letter-spacing: .2em;
     text-align: center; margin: 12px 0; cursor: pointer; position: relative;
   }
   .room-code-box::after { content: '클릭하여 복사'; font-size: .55rem; display: block; letter-spacing: .1em; opacity: .6; margin-top: 2px; }
@@ -116,12 +138,12 @@
   /* ── GAME UI ── */
   #top-bar { display: flex; align-items: center; gap: 8px; }
   .score-box { flex: 1; text-align: center; }
-  .score-name { font-family:'Cinzel',serif; font-size:.65rem; letter-spacing:.12em; color:var(--ink-light); text-transform:uppercase; }
-  .score-val { font-family:'Cinzel',serif; font-size:1.5rem; font-weight:700; color:var(--ink); }
+  .score-name { font-family:'NanumSquareRound',sans-serif; font-size:.65rem; letter-spacing:.12em; color:var(--ink-light); text-transform:uppercase; }
+  .score-val { font-family:'NanumSquareRound',sans-serif; font-size:1.5rem; font-weight:700; color:var(--ink); }
   .score-box.active-turn .score-name { color: var(--gold); }
   .score-box.active-turn .score-val { color: var(--gold); }
   .round-info { text-align:center; padding:0 12px; }
-  .deck-count { font-family:'Cinzel',serif; font-size:1.3rem; font-weight:700; color:var(--ink); }
+  .deck-count { font-family:'NanumSquareRound',sans-serif; font-size:1.3rem; font-weight:700; color:var(--ink); }
   .deck-label { font-size:.65rem; color:var(--ink-light); text-transform:uppercase; letter-spacing:.1em; }
 
   /* board */
@@ -137,7 +159,7 @@
   .discard-empty {
     width:38px; height:54px; border:1.5px dashed; border-radius:4px;
     display:flex; align-items:center; justify-content:center;
-    font-size:.55rem; opacity:.5; font-family:'Cinzel',serif;
+    font-size:.55rem; opacity:.5; font-family:'NanumSquareRound',sans-serif;
     text-transform:uppercase; letter-spacing:.05em; cursor:pointer;
   }
 
@@ -145,7 +167,7 @@
   .card {
     width:38px; height:54px; border-radius:4px; border:1.5px solid rgba(0,0,0,.25);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    font-family:'Cinzel',serif; font-weight:700; font-size:1rem;
+    font-family:'NanumSquareRound',sans-serif; font-weight:700; font-size:1rem;
     cursor:pointer; transition:transform .15s, box-shadow .15s;
     user-select:none; flex-shrink:0;
   }
@@ -182,7 +204,7 @@
 
   .turn-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--gold); animation:pulse 1.2s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }
-  .phase-chip { display:inline-block; padding:2px 8px; border-radius:20px; font-size:.65rem; font-family:'Cinzel',serif; letter-spacing:.05em; border:1px solid currentColor; margin-left:6px; }
+  .phase-chip { display:inline-block; padding:2px 8px; border-radius:20px; font-size:.65rem; font-family:'NanumSquareRound',sans-serif; letter-spacing:.05em; border:1px solid currentColor; margin-left:6px; }
   .phase-chip.play { color:var(--blue); }
   .phase-chip.draw { color:var(--green); }
 
@@ -191,18 +213,18 @@
 
   /* end screen */
   #end-screen { max-width:560px; margin:20px auto; text-align:center; }
-  #end-screen h2 { font-family:'Cinzel',serif; font-size:1.8rem; color:var(--ink); margin-bottom:4px; }
+  #end-screen h2 { font-family:'NanumSquareRound',sans-serif; font-size:1.8rem; color:var(--ink); margin-bottom:4px; }
   .score-table { width:100%; border-collapse:collapse; margin:14px 0; font-size:.88rem; }
-  .score-table th { font-family:'Cinzel',serif; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; padding:5px 8px; border-bottom:2px solid var(--gold); }
+  .score-table th { font-family:'NanumSquareRound',sans-serif; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; padding:5px 8px; border-bottom:2px solid var(--gold); }
   .score-table td { padding:5px 8px; border-bottom:1px solid var(--parchment-dark); }
-  .score-table .total-row td { font-family:'Cinzel',serif; font-weight:700; border-top:2px solid var(--gold); border-bottom:none; }
-  .winner-banner { font-family:'Cinzel',serif; font-size:1.2rem; color:var(--gold); margin:8px 0 14px; }
+  .score-table .total-row td { font-family:'NanumSquareRound',sans-serif; font-weight:700; border-top:2px solid var(--gold); border-bottom:none; }
+  .winner-banner { font-family:'NanumSquareRound',sans-serif; font-size:1.2rem; color:var(--gold); margin:8px 0 14px; }
 
   /* connection badge */
   .conn-badge {
     display:inline-flex; align-items:center; gap:5px;
     padding:3px 10px; border-radius:20px; font-size:.7rem;
-    font-family:'Cinzel',serif; letter-spacing:.05em;
+    font-family:'NanumSquareRound',sans-serif; letter-spacing:.05em;
   }
   .conn-badge.connected { background:#eaffea; color:var(--green); border:1px solid var(--green); }
   .conn-badge.waiting   { background:#fff8e0; color:#8a6800;       border:1px solid #d4ac0d; }
