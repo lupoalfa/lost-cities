@@ -402,6 +402,7 @@ const COST = 20;
 
 // ── LOCAL STATE ──
 let myRole = null;       // 'host' | 'guest'
+let actionLock = false;  // 중복 액션 방지
 let myNickname = '';
 let roomId = null;
 let gameState = null;    // latest snapshot from Firebase
@@ -570,6 +571,7 @@ window.leaveRoom = function(){
 };
 
 function handleStateUpdate(state){
+  actionLock = false; // 상태 수신 시 잠금 해제
   // myRole이 설정되지 않은 경우 무시 (리스너가 너무 일찍 실행된 경우)
   if(!myRole) return;
 
@@ -774,9 +776,10 @@ function setStatus(html){ $('status-bar').innerHTML=html; }
 
 // ── ACTIONS (write to Firebase) ──
 async function doPlay(){
-  if(!selectedCard||!gameState) return;
+  if(!selectedCard||!gameState||actionLock) return;
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='play') return;
+  actionLock = true;
   const me=state.players[myRole];
   if(!canPlayCard(selectedCard, me.expeditions)){ setStatus('⚠️ 이 카드는 현재 낼 수 없습니다.'); return; }
 
@@ -785,23 +788,32 @@ async function doPlay(){
   newExp[selectedCard.color]=[...newExp[selectedCard.color], selectedCard];
 
   sfxPlay();
-  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand, expeditions:newExp});
-  await update(ref(db,`rooms/${roomId}`),{actionPhase:'draw'});
+  try {
+    await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand, expeditions:newExp});
+    await update(ref(db,`rooms/${roomId}`),{actionPhase:'draw'});
+  } finally {
+    actionLock = false;
+  }
   selectedCard=null;
 }
 
 window.discardSelected = async function(){
-  if(!selectedCard||!gameState) return;
+  if(!selectedCard||!gameState||actionLock) return;
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='play') return;
+  actionLock = true;
   const me=state.players[myRole];
   const newHand=toArr(me.hand).filter(c=>c.id!==selectedCard.id);
   const newDiscard=safeDiscards(state.discardPiles);
   newDiscard[selectedCard.color]=[...newDiscard[selectedCard.color], selectedCard];
 
   sfxDiscard();
-  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
-  await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard, actionPhase:'draw'});
+  try {
+    await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
+    await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard, actionPhase:'draw'});
+  } finally {
+    actionLock = false;
+  }
   selectedCard=null;
 };
 
@@ -810,30 +822,35 @@ window.drawFrom = async function(source){
 };
 
 async function doDrawDeck(){
-  if(!gameState) return;
+  if(!gameState || actionLock) return;
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='draw') return;
+  actionLock = true;
   const deck=toArr(state.deck);
   if(deck.length===0) return;
   const card=deck.pop();
   const me=state.players[myRole];
   const newHand=[...toArr(me.hand), card];
   sfxDraw();
-  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
-  const nextTurn=myRole==='host'?'guest':'host';
-
-  if(deck.length===0){
-    await update(ref(db,`rooms/${roomId}`),{deck,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
-  } else {
-    await update(ref(db,`rooms/${roomId}`),{deck,actionPhase:'play',currentTurn:nextTurn});
+  try {
+    await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
+    const nextTurn=myRole==='host'?'guest':'host';
+    if(deck.length===0){
+      await update(ref(db,`rooms/${roomId}`),{deck,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
+    } else {
+      await update(ref(db,`rooms/${roomId}`),{deck,actionPhase:'play',currentTurn:nextTurn});
+    }
+  } finally {
+    actionLock = false;
   }
   selectedCard=null;
 }
 
 async function doDrawDiscard(color){
-  if(!gameState) return;
+  if(!gameState || actionLock) return;
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='draw') return;
+  actionLock = true;
   const newDiscard=safeDiscards(state.discardPiles);
   const pile=newDiscard[color];
   if(pile.length===0) return;
@@ -842,13 +859,17 @@ async function doDrawDiscard(color){
   const me=state.players[myRole];
   const newHand=[...toArr(me.hand), card];
   sfxDraw();
-  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
-  const nextTurn=myRole==='host'?'guest':'host';
-  const deck=toArr(state.deck);
-  if(deck.length===0){
-    await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
-  } else {
-    await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn});
+  try {
+    await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
+    const nextTurn=myRole==='host'?'guest':'host';
+    const deck=toArr(state.deck);
+    if(deck.length===0){
+      await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
+    } else {
+      await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn});
+    }
+  } finally {
+    actionLock = false;
   }
   selectedCard=null;
 }
