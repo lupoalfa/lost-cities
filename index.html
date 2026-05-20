@@ -295,7 +295,7 @@
   <header>
     <h1>⚜ LOST CITIES ⚜</h1>
     <p class="sub">잃어버린 도시를 향한 탐험 — 온라인 대전</p>
-    <p style="font-size:.6rem; color:var(--gold); opacity:.5; margin-top:2px; letter-spacing:.1em;">v1.0.5</p>
+    <p style="font-size:.6rem; color:var(--gold); opacity:.5; margin-top:2px; letter-spacing:.1em;">v1.0.6</p>
   </header>
 
   <div id="copied-toast" class="copied-toast">링크 복사됨!</div>
@@ -752,11 +752,6 @@ function renderHand(state){
         selectedCard=selectedCard?.id===card.id?null:card;
         renderGame(state);
       };
-      el.ondblclick=(e)=>{
-        e.stopPropagation();
-        selectedCard=card;
-        doPlay();
-      };
     }
     container.appendChild(el);
   }
@@ -799,8 +794,11 @@ async function doPlay(){
   const newExp=safeExp(me.expeditions);
   newExp[card.color]=[...newExp[card.color], card];
   sfxPlay();
-  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand, expeditions:newExp});
-  await update(ref(db,`rooms/${roomId}`),{actionPhase:'draw'});
+  await update(ref(db,`rooms/${roomId}`),{
+    [`players/${myRole}/hand`]: newHand,
+    [`players/${myRole}/expeditions`]: newExp,
+    actionPhase: 'draw'
+  });
 }
 
 window.discardSelected = async function(){
@@ -814,8 +812,11 @@ window.discardSelected = async function(){
   const newDiscard=safeDiscards(state.discardPiles);
   newDiscard[card.color]=[...newDiscard[card.color], card];
   sfxDiscard();
-  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
-  await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard, actionPhase:'draw'});
+  await update(ref(db,`rooms/${roomId}`),{
+    [`players/${myRole}/hand`]: newHand,
+    discardPiles: newDiscard,
+    actionPhase: 'draw'
+  });
 };
 
 window.drawFrom = async function(source){
@@ -835,12 +836,14 @@ async function doDrawDeck(){
   const newHand=[...toArr(me.hand), card];
   sfxDraw();
   const nextTurn=myRole==='host'?'guest':'host';
-  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
-  if(deck.length===0){
-    await update(ref(db,`rooms/${roomId}`),{deck,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
-  } else {
-    await update(ref(db,`rooms/${roomId}`),{deck,actionPhase:'play',currentTurn:nextTurn});
-  }
+  const updateData = {
+    [`players/${myRole}/hand`]: newHand,
+    deck,
+    actionPhase: 'play',
+    currentTurn: nextTurn
+  };
+  if(deck.length===0) updateData.phase='ended';
+  await update(ref(db,`rooms/${roomId}`), updateData);
 }
 
 async function doDrawDiscard(color){
@@ -858,12 +861,14 @@ async function doDrawDiscard(color){
   sfxDraw();
   const nextTurn=myRole==='host'?'guest':'host';
   const deck=toArr(state.deck);
-  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
-  if(deck.length===0){
-    await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
-  } else {
-    await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn});
-  }
+  const updateData2 = {
+    [`players/${myRole}/hand`]: newHand,
+    discardPiles: newDiscard,
+    actionPhase: 'play',
+    currentTurn: nextTurn
+  };
+  if(deck.length===0) updateData2.phase='ended';
+  await update(ref(db,`rooms/${roomId}`), updateData2);
 }
 
 // ── END SCREEN ──
@@ -891,6 +896,7 @@ function renderEndScreen(state){
 }
 
 window.requestRematch = async function(){
+  window._drawBusy = false;
   await update(ref(db,`rooms/${roomId}/rematch`),{[myRole]:true});
 };
 
@@ -910,6 +916,8 @@ function checkRematchStatus(state){
 }
 
 async function resetGame(){
+  window._drawBusy = false;
+  selectedCard = null;
   const deck=createDeck();
   const hand0=[],hand1=[];
   for(let i=0;i<8;i++){ hand0.push(deck.pop()); hand1.push(deck.pop()); }
