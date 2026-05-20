@@ -295,7 +295,7 @@
   <header>
     <h1>⚜ LOST CITIES ⚜</h1>
     <p class="sub">잃어버린 도시를 향한 탐험 — 온라인 대전</p>
-    <p style="font-size:.6rem; color:var(--gold); opacity:.5; margin-top:2px; letter-spacing:.1em;">v1.0.4</p>
+    <p style="font-size:.6rem; color:var(--gold); opacity:.5; margin-top:2px; letter-spacing:.1em;">v1.0.5</p>
   </header>
 
   <div id="copied-toast" class="copied-toast">링크 복사됨!</div>
@@ -403,7 +403,6 @@ const COST = 20;
 
 // ── LOCAL STATE ──
 let myRole = null;       // 'host' | 'guest'
-let actionLock = false;  // 중복 액션 방지
 let myNickname = '';
 let roomId = null;
 let gameState = null;    // latest snapshot from Firebase
@@ -582,7 +581,6 @@ function handleStateUpdate(state){
   }
   if(state.phase==='playing'){
     // 게스트 참가 완료 → 양쪽 모두 게임 화면으로 전환
-    actionLock = false; // 게임 화면 진입 시 잠금 해제
     const wasWaiting = document.getElementById('waiting-room') && !document.getElementById('waiting-room').classList.contains('hidden');
     hide('waiting-room'); hide('lobby'); hide('end-screen');
     show('game-ui');
@@ -609,7 +607,6 @@ function isMyTurn(state){
 
 function renderGame(state){
   if(!myRole || !state.players) return;
-  actionLock = false; // 렌더링 시점에 잠금 해제 보장
   const me=state.players[myRole];
   const opp=state.players[oppKey()];
   if(!me || !opp) return;
@@ -705,13 +702,13 @@ function renderBoard(state){
       const emp=document.createElement('div');
       emp.className='discard-empty'; emp.style.color=colorHex(c); emp.style.borderColor=colorHex(c);
       if(myTurn&&drawPhase) emp.classList.add('draw-highlight');
-      emp.onclick=()=>{ if(myTurn&&drawPhase) doDrawDiscard(c); };
+      emp.onclick=()=>{ if(myTurn&&drawPhase&&!window._drawBusy) doDrawDiscard(c); };
       emp.textContent='?';
       center.appendChild(emp);
     } else {
       const stack=document.createElement('div'); stack.className='discard-stack';
       if(myTurn&&drawPhase) stack.classList.add('draw-highlight');
-      stack.onclick=()=>{ if(myTurn&&drawPhase) doDrawDiscard(c); };
+      stack.onclick=()=>{ if(myTurn&&drawPhase&&!window._drawBusy) doDrawDiscard(c); };
       stack.innerHTML=cardHTML(pile[pile.length-1],false,false,false);
       center.appendChild(stack);
       const cnt=document.createElement('div');
@@ -777,82 +774,76 @@ function colorHex(c){
 function setStatus(html){ $('status-bar').innerHTML=html; }
 
 // ── ACTIONS (write to Firebase) ──
+// 액션 중 모든 버튼 비활성화 — Firebase 응답 오면 renderGame이 다시 활성화
+function setAllActionButtons(disabled){
+  ['btn-discard','btn-draw-deck','btn-play-dyn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.disabled=disabled;
+  });
+  // 버림패/덱 클릭 방지용 플래그
+  window._drawBusy = disabled;
+}
 async function doPlay(){
-  if(!selectedCard||!gameState||actionLock) return;
+  if(!selectedCard||!gameState) return;
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='play') return;
-  actionLock = true;
   const me=state.players[myRole];
   if(!canPlayCard(selectedCard, me.expeditions)){ setStatus('⚠️ 이 카드는 현재 낼 수 없습니다.'); return; }
-
-  const newHand=toArr(me.hand).filter(c=>c.id!==selectedCard.id);
+  setAllActionButtons(true);
+  const card=selectedCard; selectedCard=null;
+  const newHand=toArr(me.hand).filter(c=>c.id!==card.id);
   const newExp=safeExp(me.expeditions);
-  newExp[selectedCard.color]=[...newExp[selectedCard.color], selectedCard];
-
+  newExp[card.color]=[...newExp[card.color], card];
   sfxPlay();
-  try {
-    await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand, expeditions:newExp});
-    await update(ref(db,`rooms/${roomId}`),{actionPhase:'draw'});
-  } finally {
-    actionLock = false;
-  }
-  selectedCard=null;
+  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand, expeditions:newExp});
+  await update(ref(db,`rooms/${roomId}`),{actionPhase:'draw'});
 }
 
 window.discardSelected = async function(){
-  if(!selectedCard||!gameState||actionLock) return;
+  if(!selectedCard||!gameState) return;
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='play') return;
-  actionLock = true;
+  setAllActionButtons(true);
+  const card=selectedCard; selectedCard=null;
   const me=state.players[myRole];
-  const newHand=toArr(me.hand).filter(c=>c.id!==selectedCard.id);
+  const newHand=toArr(me.hand).filter(c=>c.id!==card.id);
   const newDiscard=safeDiscards(state.discardPiles);
-  newDiscard[selectedCard.color]=[...newDiscard[selectedCard.color], selectedCard];
-
+  newDiscard[card.color]=[...newDiscard[card.color], card];
   sfxDiscard();
-  try {
-    await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
-    await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard, actionPhase:'draw'});
-  } finally {
-    actionLock = false;
-  }
-  selectedCard=null;
+  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
+  await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard, actionPhase:'draw'});
 };
 
 window.drawFrom = async function(source){
+  if(window._drawBusy) return;
   await doDrawDeck();
 };
 
 async function doDrawDeck(){
-  if(!gameState || actionLock) return;
+  if(!gameState) return;
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='draw') return;
-  actionLock = true;
+  setAllActionButtons(true);
   const deck=toArr(state.deck);
   if(deck.length===0) return;
   const card=deck.pop();
   const me=state.players[myRole];
   const newHand=[...toArr(me.hand), card];
   sfxDraw();
-  try {
-    await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
-    const nextTurn=myRole==='host'?'guest':'host';
-    if(deck.length===0){
-      await update(ref(db,`rooms/${roomId}`),{deck,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
-    } else {
-      await update(ref(db,`rooms/${roomId}`),{deck,actionPhase:'play',currentTurn:nextTurn});
-    }
-  } finally {
-    actionLock = false;
+  const nextTurn=myRole==='host'?'guest':'host';
+  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
+  if(deck.length===0){
+    await update(ref(db,`rooms/${roomId}`),{deck,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
+  } else {
+    await update(ref(db,`rooms/${roomId}`),{deck,actionPhase:'play',currentTurn:nextTurn});
   }
-  selectedCard=null;
 }
 
 async function doDrawDiscard(color){
-  if(!gameState || actionLock) return;
+  if(!gameState) return;
   const state=gameState;
   if(!isMyTurn(state)||state.actionPhase!=='draw') return;
-  actionLock = true;
+  setAllActionButtons(true);
   const newDiscard=safeDiscards(state.discardPiles);
   const pile=newDiscard[color];
   if(pile.length===0) return;
@@ -861,19 +852,14 @@ async function doDrawDiscard(color){
   const me=state.players[myRole];
   const newHand=[...toArr(me.hand), card];
   sfxDraw();
-  try {
-    await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
-    const nextTurn=myRole==='host'?'guest':'host';
-    const deck=toArr(state.deck);
-    if(deck.length===0){
-      await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
-    } else {
-      await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn});
-    }
-  } finally {
-    actionLock = false;
+  const nextTurn=myRole==='host'?'guest':'host';
+  const deck=toArr(state.deck);
+  await update(ref(db,`rooms/${roomId}/players/${myRole}`),{hand:newHand});
+  if(deck.length===0){
+    await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn,phase:'ended'});
+  } else {
+    await update(ref(db,`rooms/${roomId}`),{discardPiles:newDiscard,actionPhase:'play',currentTurn:nextTurn});
   }
-  selectedCard=null;
 }
 
 // ── END SCREEN ──
