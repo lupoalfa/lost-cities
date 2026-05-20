@@ -492,6 +492,7 @@ function canPlayCard(card, expeditions){
 // ── ROOM CREATION ──
 window.createRoom = async function(){
   const nick=$('nickname-input').value.trim()||'탐험가';
+  window._drawBusy = false;
   myNickname=nick; myRole='host';
   roomId=randId();
 
@@ -533,6 +534,7 @@ window.joinRoom = async function(){
   const code=$('room-code-input').value.trim().toUpperCase();
   if(!code){ lobbyErr('방 코드를 입력하세요'); return; }
 
+  window._drawBusy = false;
   myNickname=nick; myRole='guest'; roomId=code;
   roomRef=ref(db,`rooms/${roomId}`);
 
@@ -565,6 +567,7 @@ window.leaveRoom = function(){
   if(unsubscribe && roomRef){ off(roomRef); unsubscribe=null; }
   if(roomId && myRole==='host'){ remove(ref(db,`rooms/${roomId}`)); }
   roomId=null; myRole=null; selectedCard=null; gameState=null;
+  window._drawBusy = false;
   hide('game-ui'); hide('waiting-room'); hide('end-screen');
   show('lobby');
   history.replaceState(null,'',location.pathname);
@@ -607,6 +610,7 @@ function isMyTurn(state){
 
 function renderGame(state){
   if(!myRole || !state.players) return;
+  window._drawBusy = false;
   const me=state.players[myRole];
   const opp=state.players[oppKey()];
   if(!me || !opp) return;
