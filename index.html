@@ -147,14 +147,15 @@
   .deck-label { font-size:.55rem; color:var(--ink-light); text-transform:uppercase; letter-spacing:.08em; }
 
   /* top-bar 사운드 버튼 */
-  #sound-toggle {
+  #sound-toggle, #btn-leave {
     background:none; border:1.5px solid var(--ink-light); border-radius:50%;
-    width:32px; height:32px; cursor:pointer; font-size:1rem;
+    width:32px; height:32px; cursor:pointer; font-size:.95rem;
     display:flex; align-items:center; justify-content:center;
     color:var(--ink-light); transition:all .15s; flex-shrink:0;
   }
   #sound-toggle:hover { border-color:var(--gold); color:var(--gold); }
   #sound-toggle.muted { opacity:.45; }
+  #btn-leave:hover { border-color:var(--red); color:var(--red); }
 
   /* board — 모바일에서 카드 작게 */
   .color-row { display:grid; grid-template-columns:1fr 34px 1fr; gap:3px; align-items:start; margin-bottom:3px; }
@@ -342,11 +343,7 @@
         <div class="score-val" id="p2-score">0</div>
       </div>
       <button id="sound-toggle" onclick="toggleSound()" title="사운드 켜기/끄기">🔊</button>
-    </div>
-
-    <div class="panel" id="opponent-area">
-      <div><div class="panel-title" id="opp-label">상대방 손패</div></div>
-      <div id="opponent-hand-display"></div>
+      <button id="btn-leave" onclick="leaveRoom()" title="나가기">🚪</button>
     </div>
 
     <div class="panel" id="board">
@@ -364,7 +361,6 @@
     <div id="action-area">
       <button class="btn" id="btn-discard" onclick="discardSelected()" disabled>버리기</button>
       <button class="btn" id="btn-draw-deck" onclick="drawFrom('deck')" disabled>덱에서 뽑기</button>
-      <button class="btn secondary sm" onclick="leaveRoom()">나가기</button>
     </div>
   </div>
 
@@ -634,15 +630,6 @@ function renderGame(state){
 
   // connection badge
   $('conn-badge-wrap').innerHTML=`<span class="conn-badge connected"><span class="conn-dot"></span>연결됨</span>`;
-
-  // opponent hand (backs)
-  const oppHand=toArr(opp.hand);
-  $('opp-label').textContent=`${opp.nickname||'상대방'} 손패 (${oppHand.length}장)`;
-  const oppHandEl=$('opponent-hand-display');
-  oppHandEl.innerHTML='';
-  for(let i=0;i<oppHand.length;i++){
-    const d=document.createElement('div'); d.className='opp-card-back'; oppHandEl.appendChild(d);
-  }
 
   // board
   renderBoard(state);
